@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {estimate,validateDataset} from '../planner.js';
+const p={areaHa:100,currentPct:10,targetPct:20,plantableHa:2,spacingM:5,crownM:8,survivalPct:80,overlapPct:20};
+test('capacity constrains targets and discloses remaining gap',()=>{const r=estimate(p);assert.equal(r.gapM2,100000);assert.equal(r.siteCapacity,800);assert.equal(r.feasiblePlantings,800);assert.ok(r.plantingTarget>800);assert.ok(r.unmetM2>0);});
+test('no deficit means no new planting target',()=>assert.equal(estimate({...p,currentPct:30}).plantingTarget,0));
+test('zero land cannot yield feasible plantings',()=>assert.equal(estimate({...p,plantableHa:0}).feasiblePlantings,0));
+test('worse survival increases planting demand',()=>assert.ok(estimate({...p,survivalPct:40}).plantingTarget>estimate(p).plantingTarget));
+test('reject invalid and non-finite values',()=>{for(const x of [{survivalPct:0},{areaHa:NaN},{overlapPct:100},{plantableHa:101},{currentPct:-1},{spacingM:0}])assert.throws(()=>estimate({...p,...x}));});
+const a={id:'sample',name:'Example',boundarySource:'https://example.org/boundary',canopySource:'https://example.org/canopy',method:'Example only',reviewDate:'2026-10-30',areaHa:100,currentPct:10,evidence:'illustrative'};
+test('imports retain evidence labels and reject duplicates',()=>{assert.equal(validateDataset({schemaVersion:1,areas:[a]})[0].evidence,'illustrative');assert.throws(()=>validateDataset({schemaVersion:1,areas:[a,a]}));});
+test('imports reject script URLs and impossible dates',()=>{for(const x of [{canopySource:'javascript:alert(1)'},{reviewDate:'2026-02-31'},{currentPct:101}])assert.throws(()=>validateDataset({schemaVersion:1,areas:[{...a,...x}]}));});
